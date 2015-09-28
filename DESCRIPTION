@@ -1,9 +1,9 @@
 Package: techbios
 Type: Package
-Title: Tools for working with oDesk data
+Title: Tools for working with LinkedIn biographical data for people working in tech. 
 Version: 1.0
-Date: 2013-08-10
-Author: John Horton
+Date: 2015-10-01
+Author: Alexander Gedranovich and John Horton
 Maintainer: John Horton <john.joseph.horton@gmail.com>
 Description: Pacackage analysis of Stanford CS degree holders for use "A Theory of Silicon Valley".
 Depends:
