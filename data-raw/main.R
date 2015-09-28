@@ -22,13 +22,11 @@ library(stargazer)
 library(ggplot2)
 library(ggvis)
 library(RSQLite)
+library(data.table)
 
 # Data Setup--------------------------------------------------------------------
 
 db <- dplyr::src_sqlite("stanford_cs_phd.db")
-
-
-
 
 company <- tbl(db, "Company") %>% collect()
 person <- tbl(db, "Person") %>% collect()
@@ -72,6 +70,7 @@ phd_id <- degree %>%
   filter(stri_detect_regex(phd, "(phd)|(doctorate)")) %$%
   DegreeId
 
+
 # Founder_ID
 founder_id <- title %>%
   filter(stri_detect_regex(Title, "(Founder)|(founder)|(Owner)|(owner)|(Partner)|(Creator)")) %$%
@@ -79,11 +78,54 @@ founder_id <- title %>%
 
 # Engineer ID
 engineer_id <- title %>%
-  filter(stri_detect_regex(Title, "(Engineer)|(Developer)|(Programmer)|(Software)")) %$%
+  filter(stri_detect_regex(Title, "(Engineer)|(Developer)|(Programmer)|(Software)|(Architect)")) %$%
   TitleId
 
-# RESEARCH QUESTIONS------------------------------------------------------------
+#' Career Trajectory--------------------------------------------------------------
 
+GraduatesByYear <- inner_join(person, education, by = c("PersonId" = "PersonID")) %>% 
+    group_by(PersonId, Name, Surname) %>%
+        summarize(GradYear = max(EndYear, na.rm = TRUE)) %>% na.omit
+
+GraduatesByYear$rank.order <- rank(GraduatesByYear$GradYear, ties.method = "random")
+
+df.p1 <- inner_join(inner_join(GraduatesByYear, experience,
+                               by = c("PersonId" = "PersonID")),
+                    company,
+                    by = c("CompanyID" = "CompanyId")) %>%
+                        filter(StartYear >= GradYear)
+
+df.p1$type <- "Other"
+df.p1$type <- with(df.p1, ifelse(TitleID %in% engineer_id, "Engineer",
+                          ifelse(TitleID %in% founder_id, "Founder", "Other")))                  
+df.p1 <- data.table(df.p1)
+
+
+df.p1[, any.founder := any("Founder" %in% type),
+                  by = list(PersonId)]
+df.p1[, any.engineer := any("Engineer" %in% type),
+                  by = list(PersonId)]
+
+# number of engineers
+length(unique(df.p1$PersonId))
+
+devtools::use_data(df.p1, overwrite = TRUE)
+
+
+table(df.p1$type)
+
+with(df.p1, table(any.founder, any.engineer))
+
+with(subset(df.p1, (any.engineer | any.founder)),
+     mean(any.engineer))
+
+with(subset(df.p1, (any.engineer | any.founder)),
+     mean(any.founder))
+
+
+
+# RESEARCH QUESTIONS------------------------------------------------------------
+    
 # Q1: Get the list of Stanford CS PhD Graduates (GRADS)
 GRADS <- 
   inner_join(person, education, by = c("PersonId" = "PersonID")) %>%
