@@ -55,6 +55,10 @@ StanfordCSPhDGradsOccChoicePerYear()
 ```
 
 
-## Q3: 
+## Q3: Career trajectories
 
+```{r fig.height=5, fig.width=7}
+# Plots data
+StanfordCSPhDGradsCareerHistories()
+```
 

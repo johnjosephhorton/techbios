@@ -18,11 +18,8 @@ library(stringi)
 library(magrittr)
 library(dplyr)
 library(tidyr)
-# library(stargazer)
 library(ggplot2)
-# library(ggvis)
 library(RSQLite)
-library(data.table)
 
 # Data Setup--------------------------------------------------------------------
 
@@ -90,7 +87,7 @@ GRADS <-
 
 # RESEARCH QUESTIONS------------------------------------------------------------
     
-# Q1: Number of Stanford PhD graduates by year
+# Q1: Number of Stanford PhD graduates by year----------------------------------
 df_1 <- GRADS %>%
   group_by(PersonId, Name, Surname) %>%
   summarise(StartYear = min(StartYear, na.rm = TRUE),
@@ -176,48 +173,33 @@ df_2 %<>%
 devtools::use_data(df_2, overwrite = TRUE)
 
 
-# Q3: Career Trajectory
-
+# Q3: Career Trajectory---------------------------------------------------------
 GraduatesByYear <- 
   inner_join(person, education, by = c("PersonId" = "PersonID")) %>% 
   group_by(PersonId, Name, Surname) %>%
-  summarize(GradYear = max(EndYear, na.rm = TRUE)) %>% na.omit
+  summarize(GradYear = max(EndYear, na.rm = TRUE)) %>% 
+  na.omit() %>%
+  ungroup() %>%
+  mutate(rank.order = rank(GradYear, ties.method = "random"))
 
-GraduatesByYear$rank.order <- 
-  rank(GraduatesByYear$GradYear, ties.method = "random")
+df_3 <- inner_join(
+  inner_join(GraduatesByYear, experience, by = c("PersonId" = "PersonID")),
+  company, by = c("CompanyID" = "CompanyId")) %>%
+  filter(StartYear >= GradYear) %>%
+  mutate(type = ifelse(TitleID %in% engineer_id, "Engineer",
+                       ifelse(TitleID %in% founder_id, "Founder", "Other"))) %>%
+  group_by(PersonId) %>%
+  do({
+    person_data <- .
+    person_data %>%
+      mutate(any.founder = any(type %in% "Founder"),
+             any.engineer = any(type %in% "Engineer"))
+  })
 
-df.p1 <- inner_join(inner_join(GraduatesByYear, experience,
-                               by = c("PersonId" = "PersonID")),
-                    company,
-                    by = c("CompanyID" = "CompanyId")) %>%
-  filter(StartYear >= GradYear)
-
-df.p1$type <- "Other"
-df.p1$type <- with(df.p1, ifelse(TitleID %in% engineer_id, "Engineer",
-                                 ifelse(TitleID %in% founder_id, "Founder", "Other")))                  
-df.p1 <- data.table(df.p1)
-
-
-df.p1[, any.founder := any("Founder" %in% type),
-      by = list(PersonId)]
-df.p1[, any.engineer := any("Engineer" %in% type),
-      by = list(PersonId)]
-
-# number of engineers
-length(unique(df.p1$PersonId))
-
-devtools::use_data(df.p1, overwrite = TRUE)
+devtools::use_data(df_3, overwrite = TRUE)
 
 
-table(df.p1$type)
 
-with(df.p1, table(any.founder, any.engineer))
-
-with(subset(df.p1, (any.engineer | any.founder)),
-     mean(any.engineer))
-
-with(subset(df.p1, (any.engineer | any.founder)),
-     mean(any.founder))
 
 
 ## library(data.table)

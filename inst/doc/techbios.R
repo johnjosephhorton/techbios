@@ -22,3 +22,7 @@ head(df_2)
 # Plots data
 StanfordCSPhDGradsOccChoicePerYear()
 
+## ----fig.height=5, fig.width=7-------------------------------------------
+# Plots data
+StanfordCSPhDGradsCareerHistories()
+
