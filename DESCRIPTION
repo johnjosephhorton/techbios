@@ -5,7 +5,7 @@ Version: 1.0
 Date: 2015-10-01
 Author: Alexander Gedranovich and John Horton
 Maintainer: John Horton <john.joseph.horton@gmail.com>
-Description: Pacackage analysis of Stanford CS degree holders for use "A Theory of Silicon Valley".
+Description: Package analysis of Stanford CS degree holders for use "A Theory of Silicon Valley".
 Depends:
     testthat (>= 0.7.1),
     ggplot2 (>= 0.9.3.1),
@@ -13,3 +13,5 @@ Depends:
     lubridate (>= 1.3.0),
     RPostgreSQL (>= 0.4)
 License: GPL
+Suggests: knitr
+VignetteBuilder: knitr

@@ -1,0 +1,60 @@
+---
+title: "Usage of *techbios* package"
+author: "John Horton & Alexander Gedranovich"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Demo usage of *techbios* package}
+  %\VignetteEngine{knitr::rmarkdown}
+  \usepackage[utf8]{inputenc}
+---
+
+Tools for working with LinkedIn biographical data for people working in tech, namely Stanford CS degree holders for use "A Theory of Silicon Valley"
+
+# Installation
+
+Type in `R` console:
+
+```{r eval = FALSE}
+install.packages("devtools")
+devtools::install_github("johnjosephhorton/techbios",
+                         build_vignettes = TRUE)
+```
+
+# Usage
+
+## Load the library
+
+```{r, message=FALSE}
+library(techbios)
+```
+
+Package `techbios` has several solution around Stanford PhD graduates data. They are accessible via pre-calculated data.
+
+## Q1: Number of Stanford PhD graduates by year
+
+```{r fig.height=5, fig.width=7}
+# Shows data
+data(df_1)
+head(df_1)
+
+# Plots data
+StanfordCSPhDGradsPerYear()
+```
+
+
+## Q2: Fraction of Stanford CS PhD grads choosing various career options over time
+
+```{r fig.height=5, fig.width=7}
+# Shows data
+data(df_2)
+head(df_2)
+
+# Plots data
+StanfordCSPhDGradsOccChoicePerYear()
+```
+
+
+## Q3: 
+
+

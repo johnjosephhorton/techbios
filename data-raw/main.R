@@ -18,9 +18,9 @@ library(stringi)
 library(magrittr)
 library(dplyr)
 library(tidyr)
-library(stargazer)
+# library(stargazer)
 library(ggplot2)
-library(ggvis)
+# library(ggvis)
 library(RSQLite)
 library(data.table)
 
@@ -70,7 +70,6 @@ phd_id <- degree %>%
   filter(stri_detect_regex(phd, "(phd)|(doctorate)")) %$%
   DegreeId
 
-
 # Founder_ID
 founder_id <- title %>%
   filter(stri_detect_regex(Title, "(Founder)|(founder)|(Owner)|(owner)|(Partner)|(Creator)")) %$%
@@ -81,30 +80,128 @@ engineer_id <- title %>%
   filter(stri_detect_regex(Title, "(Engineer)|(Developer)|(Programmer)|(Software)|(Architect)")) %$%
   TitleId
 
-#' Career Trajectory--------------------------------------------------------------
+# Get the list of Stanford CS PhD Graduates (GRADS)
+GRADS <- 
+  inner_join(person, education, by = c("PersonId" = "PersonID")) %>%
+  filter(SchoolId %in% stanford_id,
+         MajorId %in% cs_id,
+         DegreeId %in% phd_id,
+         Ongoing == 0)
 
-GraduatesByYear <- inner_join(person, education, by = c("PersonId" = "PersonID")) %>% 
-    group_by(PersonId, Name, Surname) %>%
-        summarize(GradYear = max(EndYear, na.rm = TRUE)) %>% na.omit
+# RESEARCH QUESTIONS------------------------------------------------------------
+    
+# Q1: Number of Stanford PhD graduates by year
+df_1 <- GRADS %>%
+  group_by(PersonId, Name, Surname) %>%
+  summarise(StartYear = min(StartYear, na.rm = TRUE),
+            EndYear = max(EndYear, na.rm = TRUE)) %>%
+  ungroup() %>%
+  na.omit() %>%
+  group_by(EndYear) %>%
+  summarise(NumGrads = n())
 
-GraduatesByYear$rank.order <- rank(GraduatesByYear$GradYear, ties.method = "random")
+devtools::use_data(df_1, overwrite = TRUE)
+
+
+# Q2: Fraction of graduates over time having title "founder" or "co-founder" in work histories post grad
+founders <- GRADS %>%
+  select(PersonId, GraduationYear = EndYear) %>%
+  left_join(experience, by = c("PersonId" = "PersonID")) %>%
+  mutate(
+    is_founder = TitleID %in% founder_id & StartYear >= GraduationYear,
+    is_engineer = TitleID %in% engineer_id & StartYear >= GraduationYear,
+    years_after_graduation = StartYear - GraduationYear) %>%
+  group_by(PersonId) %>%
+  do({
+    was_founder <- any(.$is_founder, na.rm = TRUE)
+    was_engineer <- any(.$is_engineer, na.rm = TRUE)
+    if (was_founder) {
+      year_founder <- filter(., is_founder) %$% min(StartYear, na.rm = TRUE)
+    } else {
+      year_founder <- NA
+    }
+    if (was_engineer) {
+      year_engineer <- filter(., is_engineer) %$% min(StartYear, na.rm = TRUE)
+    } else {
+      year_engineer <- NA
+    }
+    data_frame(
+      graduation_year = first(.$GraduationYear),
+      was_founder = was_founder,
+      year_founder = year_founder,
+      was_engineer = was_engineer,
+      year_engineer = year_engineer
+    )
+  }) %>%
+  ungroup()
+
+# Calculates number of founders after graduation
+years <- range(founders$graduation_year, na.rm = TRUE)
+df_2 <- data_frame(year = years[1]:years[2]) %>%
+  rowwise() %>%
+  do({
+    .year <- .$year
+    founders %>%
+      filter(graduation_year <= .year) %>%
+      mutate(year = .year) %>%
+      group_by(year) %>%
+      do({
+        to_year <- .
+        total_graduates <- nrow(to_year)
+        
+        total_founders <- to_year %>%
+          filter(was_founder, year_founder <= .year) %>%
+          nrow()
+        
+        total_engineers <- to_year %>%
+          filter(was_engineer, year_engineer <= .year) %>%
+          nrow()
+        
+        data_frame(total_graduates = total_graduates,
+                   total_founders = total_founders,
+                   total_engineers = total_engineers)
+      })
+  }) %>%
+  ungroup() %>%
+  mutate(fraction_founders = total_founders / total_graduates,
+         fraction_engineers = total_engineers / total_graduates)
+
+# Converts to 'long format'
+df_2 %<>%
+  select(year, starts_with("fraction_")) %>%
+  gather(key, value, -year) %>%
+  separate(key, c("exclude", "type")) %>%
+  select(-exclude)
+
+devtools::use_data(df_2, overwrite = TRUE)
+
+
+# Q3: Career Trajectory
+
+GraduatesByYear <- 
+  inner_join(person, education, by = c("PersonId" = "PersonID")) %>% 
+  group_by(PersonId, Name, Surname) %>%
+  summarize(GradYear = max(EndYear, na.rm = TRUE)) %>% na.omit
+
+GraduatesByYear$rank.order <- 
+  rank(GraduatesByYear$GradYear, ties.method = "random")
 
 df.p1 <- inner_join(inner_join(GraduatesByYear, experience,
                                by = c("PersonId" = "PersonID")),
                     company,
                     by = c("CompanyID" = "CompanyId")) %>%
-                        filter(StartYear >= GradYear)
+  filter(StartYear >= GradYear)
 
 df.p1$type <- "Other"
 df.p1$type <- with(df.p1, ifelse(TitleID %in% engineer_id, "Engineer",
-                          ifelse(TitleID %in% founder_id, "Founder", "Other")))                  
+                                 ifelse(TitleID %in% founder_id, "Founder", "Other")))                  
 df.p1 <- data.table(df.p1)
 
 
 df.p1[, any.founder := any("Founder" %in% type),
-                  by = list(PersonId)]
+      by = list(PersonId)]
 df.p1[, any.engineer := any("Engineer" %in% type),
-                  by = list(PersonId)]
+      by = list(PersonId)]
 
 # number of engineers
 length(unique(df.p1$PersonId))
@@ -121,138 +218,6 @@ with(subset(df.p1, (any.engineer | any.founder)),
 
 with(subset(df.p1, (any.engineer | any.founder)),
      mean(any.founder))
-
-
-
-# RESEARCH QUESTIONS------------------------------------------------------------
-    
-# Q1: Get the list of Stanford CS PhD Graduates (GRADS)
-GRADS <- 
-  inner_join(person, education, by = c("PersonId" = "PersonID")) %>%
-  filter(SchoolId %in% stanford_id,
-         MajorId %in% cs_id,
-         DegreeId %in% phd_id,
-         Ongoing == 0)
-
-df_1 <- GRADS %>%
-  group_by(PersonId, Name, Surname) %>%
-  summarise(StartYear = min(StartYear, na.rm = TRUE),
-            EndYear = max(EndYear, na.rm = TRUE)) %>%
-  ungroup() %>%
-  na.omit() %>%
-  group_by(EndYear) %>%
-  summarise(NumGrads = n())
-
-devtools::use_data(df_1, overwrite = TRUE)
-
-# Q2: Fraction of graduates over time having title "founder" or "co-founder" in work histories post grad
-
-founders <- GRADS %>%
-    select(PersonId, GraduationYear = EndYear) %>%
-      left_join(experience, by = c("PersonId" = "PersonID")) %>%
-          mutate(
-              is_founder = TitleID %in% founder_id & StartYear >= GraduationYear,
-              is_engineer = TitleID %in% engineer_id & StartYear >= GraduationYear,
-              years_after_graduation = StartYear - GraduationYear) %>%
-                  group_by(PersonId) %>%
-                      do({
-                          was_founder <- any(.$is_founder, na.rm = TRUE)
-                          was_engineer <- any(.$is_engineer, na.rm = TRUE)
-                          was_both <- any(.$is_both, na.rm = TRUE)    
-                          if (was_founder) {
-                              year_founder <- filter(., is_founder) %$% min(StartYear, na.rm = TRUE)
-                          } else {
-                              year_founder <- NA
-                          }
-                          if (was_engineer) {
-                              year_engineer <- filter(., is_engineer) %$% min(StartYear, na.rm = TRUE)
-                          } else {
-                              year_engineer <- NA
-                          }
-                          if (was_both) {
-                              year_both <- filter(., is_both) %$% min(StartYear, na.rm = TRUE)
-                          } else {
-                              year_both <- NA
-                          }
-                          data_frame(
-                              graduation_year = first(.$GraduationYear),
-                              was_founder = was_founder,
-                              year_founder = year_founder,
-                              was_engineer = was_engineer,
-                              year_engineer = year_engineer,
-                              was_both = was_both,
-                              year_both = year_both)
-                      }) %>%
-                          ungroup()
-
-
-
-founders <- GRADS %>%
-    select(PersonId, GraduationYear = EndYear) %>%
-      left_join(experience, by = c("PersonId" = "PersonID")) %>%
-          mutate(
-              is_founder = TitleID %in% founder_id & StartYear >= GraduationYear,
-              is_engineer = TitleID %in% engineer_id & StartYear >= GraduationYear,
-              years_after_graduation = StartYear - GraduationYear) %>%
-                  group_by(PersonId) %>%
-                      do({
-                          was_founder <- any(.$is_founder, na.rm = TRUE)
-                          was_engineer <- any(.$is_engineer, na.rm = TRUE)
-                          if (was_founder) {
-                              year_founder <- filter(., is_founder) %$% min(StartYear, na.rm = TRUE)
-                          } else {
-                              year_founder <- NA
-                          }
-                          if (was_engineer) {
-                              year_engineer <- filter(., is_engineer) %$% min(StartYear, na.rm = TRUE)
-                          } else {
-                              year_engineer <- NA
-                          }
-                          data_frame(
-                              graduation_year = first(.$GraduationYear),
-                              was_founder = was_founder,
-                              year_founder = year_founder,
-                              was_engineer = was_engineer,
-                              year_engineer = year_engineer
-                              )
-                      }) %>%
-                          ungroup()
-
-years <- range(founders$graduation_year, na.rm = TRUE)
-
-df_2 <- data_frame(year = years[1]:years[2]) %>%
-    rowwise() %>%
-        do({
-            .year <- .$year
-            founders %>%
-                filter(graduation_year <= .year) %>%
-                    mutate(year = .year) %>%
-                        group_by(year) %>%
-                            do({
-                                to_year <- .
-                                total_graduates <- nrow(to_year)
-                                total_founders <- to_year %>%
-                                    filter(was_founder, year_founder <= .year) %>%
-                                        nrow()
-                                total_engineers <- to_year %>%
-                                    filter(was_engineer, year_engineer <= .year) %>%
-                                        nrow()
-                                data_frame(total_graduates = total_graduates,
-                                           total_founders = total_founders,
-                                           total_engineers = total_engineers)
-                            })
-        }) %>%
-            ungroup() %>%
-                mutate(fraction_founders = total_founders / total_graduates,
-                       fraction_engineers = total_engineers / total_graduates)
-
-df_2 %<>%
-select(year, starts_with("fraction_")) %>%
-    gather(key, value, -year) %>%
-        separate(key, c("exclude", "type")) %>%
-            select(-exclude)
-
-devtools::use_data(df_2, overwrite = TRUE)
 
 
 ## library(data.table)

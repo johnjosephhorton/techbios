@@ -1,16 +1,29 @@
 # techbios
 
+Tools for working with LinkedIn biographical data for people working in tech, namely Stanford CS degree holders for use "A Theory of Silicon Valley"
+
 ## Installation
 
-This should work: 
-    library(devtools)
-    install_github("johnjosephhorton/techbios")
-    
-Certain SQL-related files need to be installed. 
-On Arch Linux, 
+### Prerequesties:
 
-    pacman -S postgresql-libs 
+Certain SQL-related files need to be installed. On Arch Linux:
 
-## How it works
+```
+pacman -S postgresql-libs
+```
 
-In the '/data-raw folder, there is an SQL database of parsed LinkedIn resumes. The file 'main.R in that folder analyzes this data and writes R objects to '/data which are then used by the R functions described in R. 
+Currently package is available via `github`:
+
+```{r}
+install.packages("devtools")
+devtools::install_github("johnjosephhorton/techbios",
+                         build_vignettes = TRUE)
+```
+
+## Documentation
+
+Extended documentation is available in package vignette:
+
+```{r}
+vignette("techbios")
+```
