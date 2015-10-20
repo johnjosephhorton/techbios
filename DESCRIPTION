@@ -7,6 +7,8 @@ Author: Alexander Gedranovich and John Horton
 Maintainer: John Horton <john.joseph.horton@gmail.com>
 Description: Package analysis of Stanford CS degree holders for use "A Theory of Silicon Valley".
 Depends:
+    magrittr (>= 1.5),
+    dplyr (>= 0.4.0),
     testthat (>= 0.7.1),
     ggplot2 (>= 0.9.3.1),
     lubridate (>= 1.3.0),

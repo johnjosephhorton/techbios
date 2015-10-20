@@ -15,6 +15,7 @@ gc(reset = TRUE)
 set.seed(12345)
 
 library(stringi)
+library(plyr)
 library(magrittr)
 library(dplyr)
 library(tidyr)
@@ -197,6 +198,30 @@ df_3 <- inner_join(
   })
 
 devtools::use_data(df_3, overwrite = TRUE)
+
+
+# Q4: Timeline of a single graduate---------------------------------------------
+
+# Finds maximum year in the dataset
+max_year <- max(experience$EndYear, na.rm = TRUE)
+
+df_4 <- inner_join(experience, company, by = c("CompanyID" = "CompanyId")) %>%
+  inner_join(title, by = c("TitleID" = "TitleId")) %>%
+  inner_join(person, by = c("PersonID" = "PersonId")) %>%
+  mutate(FullName = stri_c(Name, Surname, sep = " "),
+         EndYear = mapvalues(EndYear, from = NA, to = max_year))
+
+only_grads <- GRADS %>%
+  select(PersonId, GraduateYear = EndYear) %>%
+  na.omit()
+
+df_4_limited <- df_4 %>%
+  left_join(only_grads, by = c("PersonID" = "PersonId")) %>%
+  filter(StartYear >= GraduateYear)
+
+devtools::use_data(df_4, overwrite = TRUE)
+devtools::use_data(df_4_limited, overwrite = TRUE)
+
 
 
 
