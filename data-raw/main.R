@@ -294,18 +294,9 @@ school <- LoadTables("School")
 
 # Dataset for "companies.tex"
 
-df.company <- 
-  inner_join(experience, company, 
-             by = c("CompanyID" = "CompanyId", "src" = "src")) %>%
-                 mutate(CompanyName = plyr::mapvalues(CompanyName, "McKinsey & Company", "McKinsey")) %>%
-                 mutate(CompanyName = plyr::mapvalues(CompanyName, "Microsoft Corporation", "Microsoft")) %>%
-  group_by(CompanyName) %>%
-  summarise(n = n()) %>%
-  arrange(desc(n)) 
+devtools::use_data(experience, overwrite = TRUE)
+devtools::use_data(company, overwrite = TRUE)
    
-df_incub_company <- df.company
-
-devtools::use_data(df_incub_company, overwrite = TRUE)
 
 library(stringr)
 
