@@ -33,3 +33,7 @@ StanfordCSPhDGradsTimeline(id = 2)
 # The same, but only after graduation
 StanfordCSPhDGradsTimeline(id = 2, grads_only = TRUE)
 
+## ------------------------------------------------------------------------
+choices <- StanfordCSPhDGradsCareerChoices()
+choices
+

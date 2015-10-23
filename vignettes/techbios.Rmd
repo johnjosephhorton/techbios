@@ -73,3 +73,9 @@ StanfordCSPhDGradsTimeline(id = 2)
 StanfordCSPhDGradsTimeline(id = 2, grads_only = TRUE)
 ```
 
+## Q5
+
+```{r}
+choices <- StanfordCSPhDGradsCareerChoices()
+choices
+```
