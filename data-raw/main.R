@@ -84,7 +84,13 @@ engineer_id <- title %>%
   filter(stri_detect_regex(Title, "(Engineer)|(Developer)|(Programmer)|(Software)|(Architect)")) %$%
   TitleId
 
-# Get the list of Stanford CS PhD Graduates (GRADS)
+####################################################
+#' Get the list of Stanford CS PhD Graduates (GRADS)
+#'##################################################
+
+devtools::use_data(person, overwrite = TRUE)
+devtools::use_data(education, overwrite = TRUE)
+
 GRADS <- 
   inner_join(person, education, by = c("PersonId" = "PersonID")) %>%
   filter(SchoolId %in% stanford_id,
@@ -92,88 +98,68 @@ GRADS <-
          DegreeId %in% phd_id,
          Ongoing == 0)
 
+id_list <- list(
+    "founder_id" = founder_id,
+    "engineer_id" =  engineer_id,
+    "phd_id" = phd_id,
+    "cs_id" = cs_id,
+    "stanford_id" = stanford_id
+)
+
+devtools::use_data(id_list)
+
 # RESEARCH QUESTIONS------------------------------------------------------------
-    
+
+
+library(techbios)
+
+    GRADS <- techbios::StanfordCSgradsPhD
+    data("experience")
+    data("person")
+
+
+
+    career_choices <- GRADS %>%
+        select(PersonId, GraduationYear = EndYear) %>%
+        left_join(experience, by = c("PersonId" = "PersonID")) %>%
+        inner_join(person, by = c("PersonId" = "PersonId")) %>%
+            mutate(
+                FullName = stri_c(Name, Surname, sep = " "),
+                Choice = ifelse(TitleID %in% founder_id, "Founder", "Employee") %>%
+            actor(levels = c("Employee", "Founder"))) %>%
+         distinct() %>%
+         group_by(PersonId) %>%
+         arrange(FullName, StartYear, StartMonth) %>%
+             do({
+                 .person <- .    
+                 .person %>%
+                     mutate(PreviousJobs = 0:(n() - 1),
+                            EntrepreneurialJobs = lag(cumsum(as.numeric(Choice) - 1), default = 0),
+                            EmployeeJobs = PreviousJobs - EntrepreneurialJobs)
+             }) %>%
+                 select(Choice, 
+                        TimeDecisionMade = StartYear,
+                        ClassYear = GraduationYear,
+                        FullName,
+                        PreviousJobs,
+                        EntrepreneurialJobs, 
+                        EmployeeJobs)
+
+
+
+
+
+
+
+
+
 # Q1: Number of Stanford PhD graduates by year----------------------------------
 library(dplyr)
-
 devtools::use_data(GRADS)
-
-# devtools::use_data(df_1, overwrite = TRUE)
-
+devtools::use_data(experience)
 
 # Q2: Fraction of graduates over time having title "founder" or "co-founder" in work histories post grad
-founders <- GRADS %>%
-  select(PersonId, GraduationYear = EndYear) %>%
-  left_join(experience, by = c("PersonId" = "PersonID")) %>%
-  mutate(
-    is_founder = TitleID %in% founder_id & StartYear >= GraduationYear,
-    is_engineer = TitleID %in% engineer_id & StartYear >= GraduationYear,
-    years_after_graduation = StartYear - GraduationYear) %>%
-  group_by(PersonId) %>%
-  do({
-    was_founder <- any(.$is_founder, na.rm = TRUE)
-    was_engineer <- any(.$is_engineer, na.rm = TRUE)
-    if (was_founder) {
-      year_founder <- filter(., is_founder) %$% min(StartYear, na.rm = TRUE)
-    } else {
-      year_founder <- NA
-    }
-    if (was_engineer) {
-      year_engineer <- filter(., is_engineer) %$% min(StartYear, na.rm = TRUE)
-    } else {
-      year_engineer <- NA
-    }
-    data_frame(
-      graduation_year = first(.$GraduationYear),
-      was_founder = was_founder,
-      year_founder = year_founder,
-      was_engineer = was_engineer,
-      year_engineer = year_engineer
-    )
-  }) %>%
-  ungroup()
-
-# Calculates number of founders after graduation
-years <- range(founders$graduation_year, na.rm = TRUE)
-df_2 <- data_frame(year = years[1]:years[2]) %>%
-  rowwise() %>%
-  do({
-    .year <- .$year
-    founders %>%
-      filter(graduation_year <= .year) %>%
-      mutate(year = .year) %>%
-      group_by(year) %>%
-      do({
-        to_year <- .
-        total_graduates <- nrow(to_year)
-        
-        total_founders <- to_year %>%
-          filter(was_founder, year_founder <= .year) %>%
-          nrow()
-        
-        total_engineers <- to_year %>%
-          filter(was_engineer, year_engineer <= .year) %>%
-          nrow()
-        
-        data_frame(total_graduates = total_graduates,
-                   total_founders = total_founders,
-                   total_engineers = total_engineers)
-      })
-  }) %>%
-  ungroup() %>%
-  mutate(fraction_founders = total_founders / total_graduates,
-         fraction_engineers = total_engineers / total_graduates)
-
-# Converts to 'long format'
-df_2 %<>%
-  select(year, starts_with("fraction_")) %>%
-  gather(key, value, -year) %>%
-  separate(key, c("exclude", "type")) %>%
-  select(-exclude)
-
-devtools::use_data(df_2, overwrite = TRUE)
-
+#devtools::use_data(df_2, overwrite = TRUE)
 
 # Q3: Career Trajectory---------------------------------------------------------
 GraduatesByYear <- 
@@ -243,167 +229,6 @@ devtools::use_data(df_4_limited, overwrite = TRUE)
 #' Tech Incubator Datasets 
 ##########################
 
-library(stringr)
-
-db.yc <- src_sqlite("yc_founders_bios.db")
-db.tc <- src_sqlite("tc_founders_bios.db")
-
-.startups.path <- c("yc_companies.csv", "tc_companies.csv")
-startups <- 
-    rbind(read.table(.startups.path[1], header = TRUE, sep = ",") %>% 
-              mutate(src = "yc"),
-          read.table(.startups.path[2], header = TRUE, sep = ",") %>% 
-              mutate(src = "tc")
-          ) %>% tbl_df()
-
-.founders.path <- c("yc_founders.csv", "tc_founders.csv")
-founders <- 
-    rbind(read.table(.founders.path[1], header = TRUE, sep = ",", 
-                     na.strings = "n/a") %>%
-           mutate(src = "yc"),
-          read.table(.founders.path[2], header = TRUE, sep = ",", 
-                     na.strings = "n/a") %>%
-                         mutate(src = "tc")
-          ) %>% tbl_df()
-
-# Create DB tables connections-------------------------------------------------
-LoadTables <- function(.name, .db.yc = db.yc, .db.tc = db.tc) {
-  # Helper function to load combined tables from two source databases
-  #
-  # Args:
-  #  .name: table name to load
-  #  .db.yc: Y Combinator DB connection object
-  #  .db.tc: TechCrunch DB connectin object
-  #
-  # Returns:
-  #   Combined tables
-  
-  rbind(
-    tbl(.db.yc, .name) %>% collect() %>% mutate(src = "yc"),
-    tbl(.db.tc, .name) %>% collect() %>% mutate(src = "tc"))
-}
-
-company <- LoadTables("Company")
-person <- LoadTables("Person")
-experience <- LoadTables("Experience")
-education <- LoadTables("Education")
-major <- LoadTables("Major")
-degree <- LoadTables("Degree")
-title <- LoadTables("Title")
-school <- LoadTables("School")
-
-# Dataset for "companies.tex"
-
-devtools::use_data(experience, overwrite = TRUE)
-devtools::use_data(company, overwrite = TRUE)
-   
-
-library(stringr)
-
-# Imputes TC cohorts
-
-tc_cohorts <- 
-    read.table("tc_cohort.csv", sep = ",", header = TRUE, na.strings = "#N/A") %>% 
-     na.omit() %>%
-      mutate(year = stringr::str_match(Time.of.Techstar, "[0-9]{1,4}"),
-             season = stringr::str_match(Time.of.Techstar, "[[:alpha:]]{1,6}")
-             )
-
-
-tc_cohorts$season <- with(tc_cohorts, plyr::mapvalues(season, 
-                                                      from = c("Spring", "Fall", "Summer", NA, "Winter"), 
-                                                      to = c("S", "W", "S", "W", "W"))
-                          )
-
-tc_cohorts$class_code <- with(tc_cohorts, 
-                              stringr::str_c(season, stringr::str_sub(year, 3, 4)))
-
-
-tc_codes <- 
-  startups %>% 
-  inner_join(tc_cohorts, by = "Name") %>%
-  select(Name, class_code, src)
-
-startups %<>% 
-  left_join(tc_codes, by = c("Name", "src")) %>%
-  mutate(Class = ifelse(src == "yc", as.character(Class), class_code)) %>%
-  select(-class_code) %>%
-  na.omit()
-
-startups %<>%
-  tidyr::extract(Class, c("Season", "Year"), "([SWPF])([0-9]{2})") %>%
-  mutate(Year = 2000 + as.numeric(Year)) %>%
-  unite(cohort, Year, Season, remove = FALSE)
-
-founders %<>% na.omit()
-
-degree %<>%
-  mutate(undergraduate = 
-           stri_detect_regex(Degree, "(^BS)|(^B.S)|(^Bachelor)|(^BA)|(^B.A.)|(^B.)"))
-
-major %<>%
-  mutate(CS = 
-           str_detect(Major, "(Computer)|(Computing)|(Software)|(Information)|(Informatica)|(Informatics)"),
-         STEM = 
-           str_detect(Major, "(Engineering)|(Physics)|(Mathematics)|(Technology)|(Medicine)|(Biophysics)") & !CS,
-         Social =
-           str_detect(Major, "(Finance)|(Business)|(Economics)|(Economic)|(Public)|(Political)|(Accounting)|(Psychology)") & !CS & !STEM,
-         Other = !CS & !STEM & !Social) %>%
-  gather(Field, Value, -MajorId, -Major) %>%
-  filter(Value == TRUE) %>%
-  select(-Value) %>%
-  arrange(MajorId)
-
-education %<>%
-  mutate(DegreeId = as.integer(DegreeId),
-         MajorId = as.integer(MajorId),
-         StartYear = as.numeric(StartYear),
-         EndYear = as.numeric(EndYear))
-
-library(lubridate)
-
-experience %<>%
-  mutate(StartYear = ifelse(StartYear != "", as.numeric(StartYear), lubridate::year(Sys.Date())),
-         EndYear = as.numeric(
-           ifelse(EndYear %in% c("Present", "", "actuel", "Actualidad", "Heute"),
-                  lubridate::year(Sys.Date()), EndYear)),
-         StartMonth = ifelse(!StartMonth %in% month.name, "January", StartMonth),
-         EndMonth = ifelse(!EndMonth %in% month.name, "December", EndMonth)) %>%
-  rowwise() %>%
-  mutate(StartMonth = which(month.name %in% StartMonth),
-         EndMonth = which(month.name %in% EndMonth)) %>%
-  mutate(years = (EndYear*12 + EndMonth - StartYear*12 - StartMonth + 1) / 12) %>%
-  ungroup() %>% 
-  tbl_df()
-
-title %<>%
-  mutate(Founder = 
-           str_detect(Title, "(Founder)|(founder)|(Owner)|(owner)|(Partner)|(Creator)"),
-         Business = str_detect(Title, "(CEO)|(CTO)|(VP)|(President)|(Vice)|(Product)") &
-           !Founder,
-         Designer = 
-           str_detect(Title, "(Designer)|(designer)|(Art )|(art )|(Creative)|(creative)|(Photographer)|(Graphic)|(Design)") &
-           !Founder & !Business,
-         Developer =
-           str_detect(Title, "(Engineer)|(Developer)|(Programmer)|(Software)") &
-           !Founder & !Business & !Designer,
-         Other = !Founder & !Business & !Designer & !Developer) %>%
-  gather(Field, Value, -src, -TitleId, -Title) %>%
-  filter(Value == TRUE) %>%
-  select(-Value) %>%
-  arrange(TitleId)
-
-
-devtools::use_data(startups, overwrite = TRUE)
-
-
-school$SchoolID <- school$SchoolId
-
-df.school <- 
-    inner_join(education, school, by = c("SchoolId")) %>%
-       group_by(School) %>%
-       summarise(n = n()) %>%
-       arrange(desc(n))
 
  
 # stargazer(df.school %>% filter(n > 15 & !School %in% c("Y Combinator\n", "YCombinator\n", "YC", "TechCrunch\n")),
@@ -433,34 +258,8 @@ df.school <-
 ## # writeImage(g.per.yc.cohort, "per_yc_cohort", width = 7, height = 4)
 
 
-df_5 <- GRADS %>%
-  select(PersonId, GraduationYear = EndYear) %>%
-  left_join(experience, by = c("PersonId" = "PersonID")) %>%
-  inner_join(person, by = c("PersonId" = "PersonId")) %>%
-  mutate(FullName = stri_c(Name, Surname, sep = " "),
-         Choice = ifelse(TitleID %in% founder_id, "Founder", "Employee") %>%
-           factor(levels = c("Employee", "Founder"))) %>%
-  distinct() %>%
-  group_by(PersonId) %>%
-  arrange(FullName, StartYear, StartMonth) %>%
-  do({
-    .person <- .
-    
-    .person %>%
-      mutate(PreviousJobs = 0:(n() - 1),
-             EntrepreneurialJobs = lag(cumsum(as.numeric(Choice) - 1), default = 0),
-             EmployeeJobs = PreviousJobs - EntrepreneurialJobs)
-  }) %>%
-  select(Choice, 
-         TimeDecisionMade = StartYear,
-         ClassYear = GraduationYear,
-         FullName,
-         PreviousJobs,
-         EntrepreneurialJobs, 
-         EmployeeJobs)
->>>>>>> 844adfa41d677a4a33c0024585b755d077c9daeb
 
-devtools::use_data(df_5, overwrite = TRUE)
+devtools::use_data(career_transitions, overwrite = TRUE)
 
 
 ## library(data.table)
@@ -681,47 +480,29 @@ devtools::use_data(df_5, overwrite = TRUE)
 ## # 
 ## # 
 ## # # Q3---------------------------------------------------------------------------
-## # # Plot overall distribution of undergraduate majors of all founders 
-## # # and also faceted by cohort
-## # 
-## # pm <- left_join(degree, education, by = c("DegreeId", "src")) %>%
-## #   filter(undergraduate == TRUE) %>%
-## #   inner_join(major, by = "MajorId") %>%
-## #   select(PersonId = PersonID, Major = Field)
-## # 
-## # all.persons <- left_join(founders, person, 
-## #                          by = c("Last.Name" = "Surname", "First.Name" = "Name", "src" = "src")) %>%
-## #   inner_join(startups, by = c("Name", "src")) %>%
-## #   inner_join(pm, by = "PersonId") %>%
-## #   arrange(PersonId) %>%
-## #   distinct()
-## # 
-## # df.3a <- all.persons %>%
-## #   group_by(Major) %>%
-## #   summarise(n = n()) %>%
-## #   arrange(desc(n)) %>%
-## #   mutate(percentage = n / sum(n))
-## # 
-## # df.3a$Major <- factor(df.3a$Major, levels = df.3a$Major)
-## # 
-## # df.3a %<>% cbind(binom.confint(x = c(df.3a$n),
-## #                                n = sum(df.3a$n), 
-## #                                conf.level = 0.95,
-## #                                tol = 1e-8,
-## #                                methods = "exact") %>%
-## #                    select(lower, upper)) %>%
-## #   mutate(lower_n = round(lower * sum(n)),
-## #          upper_n = round(upper * sum(n)))
-## # 
-## # g.major <- ggplot(data = df.3a) +
-## #   geom_bar(aes(x = factor(Major), y = n), stat = "identity", colour = "black", fill = "grey") + 
-## #   geom_errorbar(aes(x = factor(Major), ymin = lower_n, ymax = upper_n), width = 0.25) +
-## #   scale_x_discrete(labels = abbreviate(df.3a$Major, 20)) +
-## #   theme_bw() + 
-## #   xlab("Major") + 
-## #   ylab("Frequency")
-## # 
-## # writeImage(g.major, "college_major", width = 7, height = 3)
+
+# Plot overall distribution of undergraduate majors of all founders 
+# and also faceted by cohort
+
+
+df.3a %<>% cbind(binom.confint(x = c(df.3a$n),
+                               n = sum(df.3a$n), 
+                               conf.level = 0.95,
+                               tol = 1e-8,
+                               methods = "exact") %>%
+                   select(lower, upper)) %>%
+  mutate(lower_n = round(lower * sum(n)),
+         upper_n = round(upper * sum(n)))
+
+g.major <- ggplot(data = df.3a) +
+  geom_bar(aes(x = factor(Major), y = n), stat = "identity", colour = "black", fill = "grey") + 
+  geom_errorbar(aes(x = factor(Major), ymin = lower_n, ymax = upper_n), width = 0.25) +
+  scale_x_discrete(labels = abbreviate(df.3a$Major, 20)) +
+  theme_bw() + 
+  xlab("Major") + 
+  ylab("Frequency")
+
+writeImage(g.major, "college_major", width = 7, height = 3)
 ## # 
 ## # df.3b <- all.persons %>%
 ## #   group_by(Major, cohort) %>%
