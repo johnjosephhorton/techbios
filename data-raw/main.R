@@ -52,7 +52,9 @@ school %<>%
 
 experience %<>%
   mutate(StartYear = suppressWarnings(as.numeric(StartYear)),
-         EndYear = suppressWarnings(as.numeric(EndYear)))
+         EndYear = suppressWarnings(as.numeric(EndYear)),
+         StartMonth = stri_trans_totitle(StartMonth)) %>%
+  mutate(StartMonth = factor(StartMonth, levels = month.name))
 
 # Stanford_ID
 stanford_id <- school %>%
@@ -221,6 +223,20 @@ df_4_limited <- df_4 %>%
 devtools::use_data(df_4, overwrite = TRUE)
 devtools::use_data(df_4_limited, overwrite = TRUE)
 
+
+# Q5: Career choices------------------------------------------------------------
+# Create a data set of individual choices about careers at different points in time
+
+# I'd like to create a dataset consisting of every "career" entry, with the following columns:
+# | Choice | TimeDecisionMade | ClassYear | IndividualName
+# The chocie should be either employee or founder.
+# The time decision made should be when they started that job/position, their class year (from Stanford) and their individual name. 
+# Please create an R function that returns this data frame.
+
+# Three more columns to add to this dataset:
+# (1) Count of previous jobs at that moment in time
+# (2) Count of previous entrepreneurial jobs
+# (3) Count of previous employee jobs 
 
 
 ##########################
@@ -426,6 +442,34 @@ df.school <-
 ## # writeImage(g.per.yc.cohort, "per_yc_cohort", width = 7, height = 4)
 
 
+df_5 <- GRADS %>%
+  select(PersonId, GraduationYear = EndYear) %>%
+  left_join(experience, by = c("PersonId" = "PersonID")) %>%
+  inner_join(person, by = c("PersonId" = "PersonId")) %>%
+  mutate(FullName = stri_c(Name, Surname, sep = " "),
+         Choice = ifelse(TitleID %in% founder_id, "Founder", "Employee") %>%
+           factor(levels = c("Employee", "Founder"))) %>%
+  distinct() %>%
+  group_by(PersonId) %>%
+  arrange(FullName, StartYear, StartMonth) %>%
+  do({
+    .person <- .
+    
+    .person %>%
+      mutate(PreviousJobs = 0:(n() - 1),
+             EntrepreneurialJobs = lag(cumsum(as.numeric(Choice) - 1), default = 0),
+             EmployeeJobs = PreviousJobs - EntrepreneurialJobs)
+  }) %>%
+  select(Choice, 
+         TimeDecisionMade = StartYear,
+         ClassYear = GraduationYear,
+         FullName,
+         PreviousJobs,
+         EntrepreneurialJobs, 
+         EmployeeJobs)
+>>>>>>> 844adfa41d677a4a33c0024585b755d077c9daeb
+
+devtools::use_data(df_5, overwrite = TRUE)
 
 
 ## library(data.table)
