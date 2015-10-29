@@ -43,18 +43,20 @@ school <- tbl(db, "School") %>% collect()
 
 education %<>%
   mutate(StartYear = suppressWarnings(as.numeric(StartYear)),
-         EndYear = suppressWarnings(as.numeric(EndYear)))
+         EndYear = suppressWarnings(as.numeric(EndYear))
+         )
 
 school %<>%
   mutate(School = 
            stri_replace_all_fixed(School, "\n", "") %>%
-           stri_trim_both())
+               stri_trim_both()
+         )
 
 experience %<>%
   mutate(StartYear = suppressWarnings(as.numeric(StartYear)),
          EndYear = suppressWarnings(as.numeric(EndYear)),
          StartMonth = stri_trans_totitle(StartMonth)) %>%
-  mutate(StartMonth = factor(StartMonth, levels = month.name))
+         mutate(StartMonth = factor(StartMonth, levels = month.name))
 
 # Stanford_ID
 stanford_id <- school %>%
@@ -76,20 +78,22 @@ phd_id <- degree %>%
 
 # Founder_ID
 founder_id <- title %>%
-  filter(stri_detect_regex(Title, "(Founder)|(founder)|(Owner)|(owner)|(Partner)|(Creator)")) %$%
+    filter(stri_detect_regex(Title,
+                             "(Founder)|(founder)|(Owner)|(owner)|(Partner)|(Creator)")) %$%
   TitleId
 
 # Engineer ID
 engineer_id <- title %>%
-  filter(stri_detect_regex(Title, "(Engineer)|(Developer)|(Programmer)|(Software)|(Architect)")) %$%
+    filter(stri_detect_regex(Title,
+                             "(Engineer)|(Developer)|(Programmer)|(Software)|(Architect)")) %$%
   TitleId
 
 ####################################################
 #' Get the list of Stanford CS PhD Graduates (GRADS)
 #'##################################################
 
-devtools::use_data(person, overwrite = TRUE)
-devtools::use_data(education, overwrite = TRUE)
+devtools::use_data(person, pkg = "..", overwrite = TRUE)
+devtools::use_data(education, pkg = "..", overwrite = TRUE)
 
 GRADS <- 
   inner_join(person, education, by = c("PersonId" = "PersonID")) %>%
@@ -106,44 +110,42 @@ id_list <- list(
     "stanford_id" = stanford_id
 )
 
-devtools::use_data(id_list)
+devtools::use_data(id_list, pkg = "..", overwrite = TRUE)
 
 # RESEARCH QUESTIONS------------------------------------------------------------
 
 
-library(techbios)
-
-    GRADS <- techbios::StanfordCSgradsPhD
-    data("experience")
-    data("person")
+## library(techbios)    GRADS <- techbios::StanfordCSgradsPhD
+##     data("experience")
+##     data("person")
 
 
 
-    career_choices <- GRADS %>%
-        select(PersonId, GraduationYear = EndYear) %>%
-        left_join(experience, by = c("PersonId" = "PersonID")) %>%
-        inner_join(person, by = c("PersonId" = "PersonId")) %>%
-            mutate(
-                FullName = stri_c(Name, Surname, sep = " "),
-                Choice = ifelse(TitleID %in% founder_id, "Founder", "Employee") %>%
-            actor(levels = c("Employee", "Founder"))) %>%
-         distinct() %>%
-         group_by(PersonId) %>%
-         arrange(FullName, StartYear, StartMonth) %>%
-             do({
-                 .person <- .    
-                 .person %>%
-                     mutate(PreviousJobs = 0:(n() - 1),
-                            EntrepreneurialJobs = lag(cumsum(as.numeric(Choice) - 1), default = 0),
-                            EmployeeJobs = PreviousJobs - EntrepreneurialJobs)
-             }) %>%
-                 select(Choice, 
-                        TimeDecisionMade = StartYear,
-                        ClassYear = GraduationYear,
-                        FullName,
-                        PreviousJobs,
-                        EntrepreneurialJobs, 
-                        EmployeeJobs)
+##     career_choices <- GRADS %>%
+##         select(PersonId, GraduationYear = EndYear) %>%
+##         left_join(experience, by = c("PersonId" = "PersonID")) %>%
+##         inner_join(person, by = c("PersonId" = "PersonId")) %>%
+##             mutate(
+##                 FullName = stri_c(Name, Surname, sep = " "),
+##                 Choice = ifelse(TitleID %in% founder_id, "Founder", "Employee") %>%
+##             factor(levels = c("Employee", "Founder"))) %>%
+##          distinct() %>%
+##          group_by(PersonId) %>%
+##          arrange(FullName, StartYear, StartMonth) %>%
+##              do({
+##                  .person <- .    
+##                  .person %>%
+##                      mutate(PreviousJobs = 0:(n() - 1),
+##                             EntrepreneurialJobs = lag(cumsum(as.numeric(Choice) - 1), default = 0),
+##                             EmployeeJobs = PreviousJobs - EntrepreneurialJobs)
+##              }) %>%
+##                  select(Choice, 
+##                         TimeDecisionMade = StartYear,
+##                         ClassYear = GraduationYear,
+##                         FullName,
+##                         PreviousJobs,
+##                         EntrepreneurialJobs, 
+##                         EmployeeJobs)
 
 
 
@@ -155,8 +157,8 @@ library(techbios)
 
 # Q1: Number of Stanford PhD graduates by year----------------------------------
 library(dplyr)
-devtools::use_data(GRADS)
-devtools::use_data(experience)
+devtools::use_data(GRADS, pkg = "..", overwrite = TRUE)
+devtools::use_data(experience, pkg = "..", overwrite = TRUE)
 
 # Q2: Fraction of graduates over time having title "founder" or "co-founder" in work histories post grad
 #devtools::use_data(df_2, overwrite = TRUE)
@@ -184,7 +186,7 @@ df_3 <- inner_join(
              any.engineer = any(type %in% "Engineer"))
   })
 
-devtools::use_data(df_3, overwrite = TRUE)
+devtools::use_data(df_3, pkg = "..", overwrite = TRUE)
 
 
 # Q4: Timeline of a single graduate---------------------------------------------
@@ -206,8 +208,8 @@ df_4_limited <- df_4 %>%
   left_join(only_grads, by = c("PersonID" = "PersonId")) %>%
   filter(StartYear >= GraduateYear)
 
-devtools::use_data(df_4, overwrite = TRUE)
-devtools::use_data(df_4_limited, overwrite = TRUE)
+devtools::use_data(df_4, pkg = "..", overwrite = TRUE)
+devtools::use_data(df_4_limited, pkg = "..", overwrite = TRUE)
 
 
 # Q5: Career choices------------------------------------------------------------
@@ -258,8 +260,7 @@ devtools::use_data(df_4_limited, overwrite = TRUE)
 ## # writeImage(g.per.yc.cohort, "per_yc_cohort", width = 7, height = 4)
 
 
-
-devtools::use_data(career_transitions, overwrite = TRUE)
+# devtools::use_data(career_transitions, pkg = "..", overwrite = TRUE)
 
 
 ## library(data.table)
@@ -484,25 +485,24 @@ devtools::use_data(career_transitions, overwrite = TRUE)
 # Plot overall distribution of undergraduate majors of all founders 
 # and also faceted by cohort
 
+## df.3a %<>% cbind(binom.confint(x = c(df.3a$n),
+##                                n = sum(df.3a$n), 
+##                                conf.level = 0.95,
+##                                tol = 1e-8,
+##                                methods = "exact") %>%
+##                    select(lower, upper)) %>%
+##   mutate(lower_n = round(lower * sum(n)),
+##          upper_n = round(upper * sum(n)))
 
-df.3a %<>% cbind(binom.confint(x = c(df.3a$n),
-                               n = sum(df.3a$n), 
-                               conf.level = 0.95,
-                               tol = 1e-8,
-                               methods = "exact") %>%
-                   select(lower, upper)) %>%
-  mutate(lower_n = round(lower * sum(n)),
-         upper_n = round(upper * sum(n)))
+## g.major <- ggplot(data = df.3a) +
+##   geom_bar(aes(x = factor(Major), y = n), stat = "identity", colour = "black", fill = "grey") + 
+##   geom_errorbar(aes(x = factor(Major), ymin = lower_n, ymax = upper_n), width = 0.25) +
+##   scale_x_discrete(labels = abbreviate(df.3a$Major, 20)) +
+##   theme_bw() + 
+##   xlab("Major") + 
+##   ylab("Frequency")
 
-g.major <- ggplot(data = df.3a) +
-  geom_bar(aes(x = factor(Major), y = n), stat = "identity", colour = "black", fill = "grey") + 
-  geom_errorbar(aes(x = factor(Major), ymin = lower_n, ymax = upper_n), width = 0.25) +
-  scale_x_discrete(labels = abbreviate(df.3a$Major, 20)) +
-  theme_bw() + 
-  xlab("Major") + 
-  ylab("Frequency")
-
-writeImage(g.major, "college_major", width = 7, height = 3)
+## writeImage(g.major, "college_major", width = 7, height = 3)
 ## # 
 ## # df.3b <- all.persons %>%
 ## #   group_by(Major, cohort) %>%

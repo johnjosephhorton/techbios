@@ -15,16 +15,17 @@ StanfordCSgradsPhD <- function(){
          MajorId %in% id_list$cs_id,
          DegreeId %in% id_list$phd_id,
          Ongoing == 0)
-
-    #data("GRADS")
     
     founders <- GRADS %>%
         select(PersonId, GraduationYear = EndYear) %>%
             left_join(experience, by = c("PersonId" = "PersonID")) %>%
                 mutate(
-                    is_founder = TitleID %in% id_list$founder_id & StartYear >= GraduationYear,
-                    is_engineer = TitleID %in% id_list$engineer_id & StartYear >= GraduationYear,
-                    years_after_graduation = as.numeric(StartYear) - as.numeric(GraduationYear)
+                    is_founder = TitleID %in% id_list$founder_id &
+                        StartYear >= GraduationYear,
+                    is_engineer = TitleID %in% id_list$engineer_id &
+                        StartYear >= GraduationYear,
+                    years_after_graduation = as.numeric(StartYear) -
+                        as.numeric(GraduationYear)
                 ) %>%
                     group_by(PersonId)
     
